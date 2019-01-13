@@ -27,7 +27,7 @@ class Net(nn.Module):
     
 transform = transforms.ToTensor()
 # Download MNIST dataset
-root_dir = "data/"
+root_dir = "../example/data/"
 train_dataset = datasets.MNIST(root_dir, train=True, transform=transform, 
                                download=True)
 test_dataset = datasets.MNIST(root_dir, train=False, transform=transform, 
@@ -35,7 +35,7 @@ test_dataset = datasets.MNIST(root_dir, train=False, transform=transform,
 
 # Make train and test Dataloader
 BATCH_SIZE = 128
-epochs = 50
+epochs = 5
 train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, 
                          shuffle=True, num_workers=4)
 test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, 
