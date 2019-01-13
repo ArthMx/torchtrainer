@@ -13,7 +13,7 @@ class Progbar(object):
         interval: Minimum visual progress update interval (in seconds).
     """
 
-    def __init__(self, target, val_target=None, width=20, verbose=1, interval=0.05):
+    def __init__(self, target, val_target=None, width=30, verbose=1, interval=0.05):
         self.target = target
         self.val_target = val_target
         self.width = width
@@ -27,6 +27,7 @@ class Progbar(object):
         self.current = 0
         if self.val_target:
             self.val_current = 0
+            self.val_step = 0
         self._values = collections.OrderedDict()
         self._start = time.time()
         self._last_update = 0
@@ -54,43 +55,43 @@ class Progbar(object):
             self.current += 1
         else:
             self.val_current += 1
+            if self.val_step == 0:
+                self.val_step = 1
+                self.current = 1
+                self.target = self.val_target
+            else:
+                self.current += 1
+            
 
         now = time.time()
-        info = ' - %.0fs' % (now - self._start)
         if self.verbose == 1:
-            if (now - self._last_update < self.interval and
-                    self.current < self.target):
+            if now - self._last_update < self.interval and \
+            self.current != self.target and \
+            self.val_current != self.val_target:
                 return
 
-            prev_total_width = self._total_width
-            if self._dynamic_display:
-                sys.stdout.write('\b' * prev_total_width)
-                sys.stdout.write('\r')
-            else:
-                sys.stdout.write('\n')
+            line = "\r"
+            
+            if self.current < self.target:
+                numdigits = int(np.floor(np.log10(self.target))) + 1
+                barstr = '%%%dd/%d [' % (numdigits, self.target)
+                bar = barstr % self.current
+                prog = float(self.current) / self.target
+                prog_width = int(self.width * prog)
+                if prog_width > 0:
+                    bar += ('=' * (prog_width - 1))
+                    if self.current < self.target:
+                        bar += '>'
+                    else:
+                        bar += '='
+                bar += ('.' * (self.width - prog_width))
+                bar += ']'
+                    
+                line += bar
 
-            numdigits = int(np.floor(np.log10(self.target))) + 1
-            barstr = '%%%dd/%d [' % (numdigits, self.target)
-            bar = barstr % self.current
-            prog = float(self.current) / self.target
-            prog_width = int(self.width * prog)
-            if prog_width > 0:
-                bar += ('=' * (prog_width - 1))
-                if self.current < self.target:
-                    bar += '>'
-                else:
-                    bar += '='
-            bar += ('.' * (self.width - prog_width))
-            bar += ']'
 
-            self._total_width = len(bar)
-            sys.stdout.write(bar)
-
-            if self.current:
-                running_time = now - self._start
-                time_per_unit = running_time / self.current
-            else:
-                time_per_unit = 0
+            running_time = now - self._start
+            time_per_unit = running_time / self.current
                 
             if self.current < self.target:
                 eta = time_per_unit * (self.target - self.current)
@@ -104,20 +105,19 @@ class Progbar(object):
 
                 info = ' - ETA: %s' % eta_format
             else:
-                info = " -"
+                info = ""
                 if running_time > 3600:
-                    info += (' %d:%02d:%02d' % (running_time // 3600, 
+                    info += ('%d:%02d:%02d' % (running_time // 3600, 
                                                (running_time % 3600) // 60, 
                                                running_time % 60))
                 elif running_time > 60:
-                    info += ' %d:%02d' % (running_time // 60, running_time % 60)
+                    info += '%d:%02d' % (running_time // 60, running_time % 60)
                 elif running_time >= 1:
-                    info += ' %ds' % (running_time // 1)
-                    info += ' %dms' % int((running_time % 1) * 1e3)
+                    info += '%.3fs' % running_time
                 elif  running_time >= 1e3:
-                    info += ' %dms' % int(running_time  * 1e3)
+                    info += '%dms' % int(running_time  * 1e3)
                 elif running_time >= 1e6:
-                    info += ' %dus' % int(running_time * 1e6)
+                    info += '%dus' % int(running_time * 1e6)
             
             for k in self._values:
                 info += ' - %s:' % k
@@ -126,23 +126,35 @@ class Progbar(object):
                     info += ' %.4f' % avg
                 else:
                     info += ' %.4e' % avg
-
-            self._total_width += len(info)
-            if prev_total_width > self._total_width:
-                info += (' ' * (prev_total_width - self._total_width))
             
+            info += ' ' * 50
             if (self.val_target is None) and (self.current == self.target) or \
                 (self.val_target is not None) and (self.val_current == self.val_target):
                     info += '\n'
             
-            sys.stdout.write(info)
+            line += info
+            sys.stdout.write(line)
             sys.stdout.flush()
             
             
         elif self.verbose == 2:
             if (self.val_target is None and self.current == self.target) or \
                     (self.val_current == self.val_target):
-                    
+                info = ""
+                running_time = now - self._start
+                if running_time > 3600:
+                    info += ('%d:%02d:%02d' % (running_time // 3600, 
+                                               (running_time % 3600) // 60, 
+                                               running_time % 60))
+                elif running_time > 60:
+                    info += '%d:%02d' % (running_time // 60, running_time % 60)
+                elif running_time >= 1:
+                    info += '%.3fs' % running_time
+                elif  running_time >= 1e3:
+                    info += '%dms' % int(running_time  * 1e3)
+                elif running_time >= 1e6:
+                    info += '%dus' % int(running_time * 1e6)
+            
                 for k in self._values:
                     info += ' - %s:' % k
                     avg = self._values[k].average()
@@ -152,7 +164,6 @@ class Progbar(object):
                         info += ' %.4e' % avg
         
                 info += '\n'
-    
                 sys.stdout.write(info)
                 sys.stdout.flush()
 

@@ -81,9 +81,9 @@ class Trainer(object):
             
             # Track losses for plotting
             if plot_loss:
-                train_losses.append(self.progbar._values["t_loss"].average())
+                train_losses.append(self.progbar._values["train loss"].average())
                 if val_loader:
-                     val_losses.append(self.progbar._values["v_loss"].average())
+                     val_losses.append(self.progbar._values["val loss"].average())
             
             # Save best model if improvement on validation loss
             if checkpoint_path and val_losses[-1] < best_val_loss:
@@ -142,8 +142,8 @@ class Trainer(object):
         self.optimizer.step()
         
         # Track metrics
-        return [("t_loss", loss.item()),
-                ("t_acc", self._accuracy(y_pred, y))
+        return [("train loss", loss.item()),
+                ("train acc", self._accuracy(y_pred, y))
                 ]
     
     def validate(self, batch):
@@ -162,8 +162,8 @@ class Trainer(object):
         loss = self.loss_fn(y_pred, y)
 
         # Track metrics
-        return [("v_loss", loss.item()),
-                ("v_acc", self._accuracy(y_pred, y))
+        return [("val loss", loss.item()),
+                ("val acc", self._accuracy(y_pred, y))
                 ]
     
     def _train_loop(self, train_loader):

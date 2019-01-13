@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name='torchtrainer',
-    version='0.0.1',
+    version='0.0.2',
     author='Arthur Moraux',
     author_email='arthur.moraux@gmail.com',
     description='A package for training pytorch models.',
