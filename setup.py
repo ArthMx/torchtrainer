@@ -1,14 +1,13 @@
 from setuptools import setup
 
 setup(
-    name='TorchTrainer',
+    name='torchtrainer',
     url='https://github.com/ArthMx/torchtrainer',
     author='Arthur Moraux',
     author_email='arthur.moraux@meteo.be',
     packages=['torchtrainer'],
     install_requires=['numpy', 'torch', 'matplotlib', 'collections', 'time', 
-                      'sys', 'os', 'functools'],
-    version='0.1',
+                      'sys', 'os', 'functools']
     license='MIT',
-    description='A package for training pytorch models.',
+    description='A package for training pytorch models.'
 )
