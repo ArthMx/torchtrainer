@@ -1,13 +1,21 @@
-from setuptools import setup
+import setuptools
 
-setup(
+with open("README.md", "r") as fh:
+    long_description = fh.read()
+
+setuptools.setup(
     name='torchtrainer',
-    version='0.1',
-    description='A package for training pytorch models.',
-    url='https://github.com/ArthMx/torchtrainer',
+    version='0.0.1',
     author='Arthur Moraux',
     author_email='arthur.moraux@gmail.com',
-    packages=['torchtrainer'],
-    install_requires=['numpy', 'torch', 'matplotlib', 'functools'],
-    license='MIT',
+    description='A package for training pytorch models.',
+    long_description=long_description,
+    long_description_content_type="text/markdown",
+    url='https://github.com/ArthMx/torchtrainer',
+    packages=setuptools.find_packages(),
+    classifiers=[
+        "Programming Language :: Python :: 3",
+        "License :: OSI Approved :: MIT License",
+        "Operating System :: OS Independent",
+    ],
 )
