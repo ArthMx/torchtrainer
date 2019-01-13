@@ -7,7 +7,7 @@ setup(
     author_email='arthur.moraux@meteo.be',
     packages=['torchtrainer'],
     install_requires=['numpy', 'torch', 'matplotlib', 'collections', 'time', 
-                      'sys', 'os', 'functools']
+                      'sys', 'os', 'functools'],
     license='MIT',
     description='A package for training pytorch models.'
 )
