@@ -57,15 +57,13 @@ class Trainer(object):
             assert isinstance(metrics, (tuple, list))
             for metric in metrics:
                 assert metric in ("data_time", "batch_time")
-        
-        if checkpoint_path is not None:
+                    
+        if early_stopping or checkpoint_path is not None:
             assert val_loader is not None
-            best_val_loss = np.inf
-            
-        if early_stopping:
-            assert train_loader is not None
-            assert isinstance(early_stopping, int)
-            n = 0
+            if early_stopping:
+                assert isinstance(early_stopping, int)
+        best_val_loss = np.inf
+        n = 0
             
         if val_loader:
             val_losses = []
@@ -89,34 +87,35 @@ class Trainer(object):
             # Track losses for plotting
             if plot_loss:
                 train_losses.append(self.progbar._values["train_loss"].average())
+                if val_loader:
+                     val_losses.append(self.progbar._values["val_loss"].average())
+            
             if val_loader:
-                 val_losses.append(self.progbar._values["val_loss"].average())
-            
-            # Save best model if improvement on validation loss
-            if checkpoint_path and val_losses[-1] < best_val_loss:
-                # Save model_dict model_state_dict, optimizer_state_dict, epoch, 
-                # and all metrics in progbar.
-                metrics_dict = {"Epoch": epoch}
-                for k in self.progbar._values.keys():
-                    metrics_dict[k] = self.progbar._values[k].average()
-                self.save_checkpoint(checkpoint_path, metrics_dict)
-                print("Model improved, saved at " + checkpoint_path)
-            
-            # Check for early stopping
-            if early_stopping:
-                if val_losses[-1] >= best_val_loss:
-                    n += 1
-                    if n < early_stopping:
-                        print("No improvement in %d Epochs." % n)
-                    if n >= early_stopping:
-                        print("No improvement in %d Epochs: Early Stopping." % n)
-                        break
-                else:
-                    n = 0
-            
-            # Update best_val_loss
-            if val_losses[-1] < best_val_loss:
-                best_val_loss = val_losses[-1]
+                # Save best model if improvement on validation loss
+                if checkpoint_path and self.progbar._values["val_loss"].average() < best_val_loss:
+                    # Save model_dict model_state_dict, optimizer_state_dict, epoch, 
+                    # and all metrics in progbar.
+                    metrics_dict = {"Epoch": epoch}
+                    for k in self.progbar._values.keys():
+                        metrics_dict[k] = self.progbar._values[k].average()
+                    self.save_checkpoint(checkpoint_path, metrics_dict)
+                    print("Model improved, saved at " + checkpoint_path)
+                
+                # Check for early stopping
+                if early_stopping:
+                    if self.progbar._values["val_loss"].average() >= best_val_loss:
+                        n += 1
+                        if n < early_stopping:
+                            print("No improvement in %d Epochs." % n)
+                        if n >= early_stopping:
+                            print("No improvement in %d Epochs: Early Stopping." % n)
+                            break
+                    else:
+                        n = 0
+                
+                # Update best_val_loss
+                if self.progbar._values["val_loss"].average() < best_val_loss:
+                    best_val_loss = self.progbar._values["val_loss"].average()
                     
         # Plot loss
         if plot_loss:
@@ -149,9 +148,7 @@ class Trainer(object):
         self.optimizer.step()
         
         # Track metrics
-        return [("train_loss", loss.item()),
-                ("train_acc", self._accuracy(y_pred, y))
-                ]
+        return [("train_loss", loss.item())]
     
     def validate(self, batch):
         """A single step of validation through one batch. 
@@ -169,9 +166,7 @@ class Trainer(object):
         loss = self.loss_fn(y_pred, y)
 
         # Track metrics
-        return [("val_loss", loss.item()),
-                ("val_acc", self._accuracy(y_pred, y))
-                ]
+        return [("val_loss", loss.item())]
     
     def _train_loop(self, train_loader, metrics):
         """Do a single epoch of training."""
@@ -182,13 +177,15 @@ class Trainer(object):
         for batch in train_loader:
             values = []
             
-            if "data_time" in metrics:
-                values.append(("data_time", (time.time() - t0)))
+            if metrics:
+                if "data_time" in metrics:
+                    values.append(("data_time", (time.time() - t0)))
                 
             vals = self.train(batch)
             
-            if "batch_time" in metrics:
-                values.append(("batch_time", (time.time() - t0)))
+            if metrics:
+                if "batch_time" in metrics:
+                    values.append(("batch_time", (time.time() - t0)))
             
             for val in vals:
                 values.append(val)
@@ -246,8 +243,3 @@ class Trainer(object):
         
         return Progbar(target=len_train_loader, 
                        val_target=len_val_loader, verbose=verbose)
-        
-    def _accuracy(self, y_pred, y):
-        """Compute the accuracy for a batch of prediction and target."""
-        _, y_pred = torch.max(y_pred, 1)
-        return (y_pred == y).cpu().numpy().mean() * 100

@@ -148,9 +148,7 @@ class Trainer(object):
         self.optimizer.step()
         
         # Track metrics
-        return [("train_loss", loss.item()),
-                ("train_acc", self._accuracy(y_pred, y))
-                ]
+        return [("train_loss", loss.item())]
     
     def validate(self, batch):
         """A single step of validation through one batch. 
@@ -168,9 +166,7 @@ class Trainer(object):
         loss = self.loss_fn(y_pred, y)
 
         # Track metrics
-        return [("val_loss", loss.item()),
-                ("val_acc", self._accuracy(y_pred, y))
-                ]
+        return [("val_loss", loss.item())]
     
     def _train_loop(self, train_loader, metrics):
         """Do a single epoch of training."""
@@ -247,8 +243,3 @@ class Trainer(object):
         
         return Progbar(target=len_train_loader, 
                        val_target=len_val_loader, verbose=verbose)
-        
-    def _accuracy(self, y_pred, y):
-        """Compute the accuracy for a batch of prediction and target."""
-        _, y_pred = torch.max(y_pred, 1)
-        return (y_pred == y).cpu().numpy().mean() * 100
