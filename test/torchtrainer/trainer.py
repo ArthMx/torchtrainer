@@ -57,13 +57,15 @@ class Trainer(object):
             assert isinstance(metrics, (tuple, list))
             for metric in metrics:
                 assert metric in ("data_time", "batch_time")
-                    
-        if early_stopping or checkpoint_path is not None:
+        
+        if checkpoint_path is not None:
             assert val_loader is not None
-            if early_stopping:
-                assert isinstance(early_stopping, int)
-        best_val_loss = np.inf
-        n = 0
+            best_val_loss = np.inf
+            
+        if early_stopping:
+            assert train_loader is not None
+            assert isinstance(early_stopping, int)
+            n = 0
             
         if val_loader:
             val_losses = []
@@ -87,35 +89,34 @@ class Trainer(object):
             # Track losses for plotting
             if plot_loss:
                 train_losses.append(self.progbar._values["train_loss"].average())
-                if val_loader:
-                     val_losses.append(self.progbar._values["val_loss"].average())
-            
             if val_loader:
-                # Save best model if improvement on validation loss
-                if checkpoint_path and self.progbar._values["val_loss"].average() < best_val_loss:
-                    # Save model_dict model_state_dict, optimizer_state_dict, epoch, 
-                    # and all metrics in progbar.
-                    metrics_dict = {"Epoch": epoch}
-                    for k in self.progbar._values.keys():
-                        metrics_dict[k] = self.progbar._values[k].average()
-                    self.save_checkpoint(checkpoint_path, metrics_dict)
-                    print("Model improved, saved at " + checkpoint_path)
-                
-                # Check for early stopping
-                if early_stopping:
-                    if self.progbar._values["val_loss"].average() >= best_val_loss:
-                        n += 1
-                        if n < early_stopping:
-                            print("No improvement in %d Epochs." % n)
-                        if n >= early_stopping:
-                            print("No improvement in %d Epochs: Early Stopping." % n)
-                            break
-                    else:
-                        n = 0
-                
-                # Update best_val_loss
-                if self.progbar._values["val_loss"].average() < best_val_loss:
-                    best_val_loss = self.progbar._values["val_loss"].average()
+                 val_losses.append(self.progbar._values["val_loss"].average())
+            
+            # Save best model if improvement on validation loss
+            if checkpoint_path and val_losses[-1] < best_val_loss:
+                # Save model_dict model_state_dict, optimizer_state_dict, epoch, 
+                # and all metrics in progbar.
+                metrics_dict = {"Epoch": epoch}
+                for k in self.progbar._values.keys():
+                    metrics_dict[k] = self.progbar._values[k].average()
+                self.save_checkpoint(checkpoint_path, metrics_dict)
+                print("Model improved, saved at " + checkpoint_path)
+            
+            # Check for early stopping
+            if early_stopping:
+                if val_losses[-1] >= best_val_loss:
+                    n += 1
+                    if n < early_stopping:
+                        print("No improvement in %d Epochs." % n)
+                    if n >= early_stopping:
+                        print("No improvement in %d Epochs: Early Stopping." % n)
+                        break
+                else:
+                    n = 0
+            
+            # Update best_val_loss
+            if val_losses[-1] < best_val_loss:
+                best_val_loss = val_losses[-1]
                     
         # Plot loss
         if plot_loss:
@@ -181,15 +182,13 @@ class Trainer(object):
         for batch in train_loader:
             values = []
             
-            if metrics:
-                if "data_time" in metrics:
-                    values.append(("data_time", (time.time() - t0)))
+            if "data_time" in metrics:
+                values.append(("data_time", (time.time() - t0)))
                 
             vals = self.train(batch)
             
-            if metrics:
-                if "batch_time" in metrics:
-                    values.append(("batch_time", (time.time() - t0)))
+            if "batch_time" in metrics:
+                values.append(("batch_time", (time.time() - t0)))
             
             for val in vals:
                 values.append(val)

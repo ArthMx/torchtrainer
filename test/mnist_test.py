@@ -9,8 +9,8 @@ from torchtrainer import Trainer
 class Net(nn.Module):
     def __init__(self):
         super().__init__()
-        self.conv1 = nn.Conv2d(1, 32, 3)
-        self.conv2 = nn.Conv2d(32, 64, 3)
+        self.conv1 = nn.Sequential(nn.Conv2d(1, 32, 3), nn.BatchNorm2d(32))
+        self.conv2 = nn.Sequential(nn.Conv2d(32, 64, 3), nn.BatchNorm2d(64))
         self.dropout1 = nn.Dropout(0.25)
         self.fc1 = nn.Linear(64 * 12 * 12, 128)
         self.dropout2 = nn.Dropout(0.5)
@@ -50,4 +50,5 @@ trainer = Trainer(net, loss_fn, optimizer)
 print("Number of trainable parameters: %d" % trainer.get_num_parameters())
 
 trainer.fit(train_loader, val_loader=test_loader, epochs=epochs, verbose=1,
-          checkpoint_path="models/checkpoint.tar", plot_loss=True, early_stopping=5)
+          checkpoint_path="models/checkpoint.tar", metrics=["data_time", "batch_time"],
+          plot_loss=True, early_stopping=5)
