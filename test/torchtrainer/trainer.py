@@ -220,9 +220,9 @@ class Trainer(object):
                 saved.
         """
         # Create directory if necessary
-        checkpoint_dir = "".join(path.split("/")[:-1])
-        if not os.path.exists(checkpoint_dir) and checkpoint_dir != "":
-            os.mkdir(checkpoint_dir)
+        checkpoint_dir = os.path.join(*path.split("/")[:-1])
+        if not os.path.exists(checkpoint_dir):
+            os.makedirs(checkpoint_dir)
         
         # make checkpoint
         checkpoint = {

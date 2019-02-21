@@ -30,11 +30,12 @@ def accuracy(y_pred, y):
     return (y_pred == y).cpu().numpy().mean()
 
 transform = transforms.ToTensor()
-# Download MNIST dataset
-root_dir = "../example/data/"
-train_dataset = datasets.MNIST(root_dir, train=True, transform=transform, 
+# Download MNIST dataset and make datasets
+root_dir = "../example"
+data_dir = root_dir + "/data"
+train_dataset = datasets.MNIST(data_dir, train=True, transform=transform, 
                                download=True)
-test_dataset = datasets.MNIST(root_dir, train=False, transform=transform, 
+test_dataset = datasets.MNIST(data_dir, train=False, transform=transform, 
                               download=True)
 
 # Make train and test Dataloader
@@ -54,5 +55,6 @@ trainer = Trainer(net, loss_fn, optimizer, metrics={"acc": accuracy})
 print("Number of trainable parameters: %d" % trainer.get_num_parameters())
 print(trainer.model)
 
+checkpoint_path = root_dir + "/models/chkpth.tar"
 trainer.fit(train_loader, val_loader=test_loader, epochs=epochs, verbose=1,
-          plot_loss=True, early_stopping=5)
+          plot_loss=True, early_stopping=5, checkpoint_path=checkpoint_path)
