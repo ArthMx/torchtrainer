@@ -3,14 +3,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 from functools import reduce
 import os
-from .utils import Progbar
 import time
-
+from .utils import Progbar
 
 class Trainer(object):
     """Class abstracting model training in PyTorch."""
     
-    def __init__(self, model, loss_fn, optimizer, device="auto"):
+    def __init__(self, model, loss_fn, optimizer, metrics=None, device="auto"):
         """Wrapper class to train a PyTorch model.
         Args:
             model: A Pytorch model.
@@ -31,13 +30,12 @@ class Trainer(object):
         self.model = model.to(self.device)
         self.loss_fn = loss_fn
         self.optimizer = optimizer
+        self.metrics = metrics
         
-    def get_num_parameters(self):
-        """Return the total number of parameters of the model."""
-        return sum(reduce(lambda a, b: a*b, x.size()) for x in self.model.parameters())
+        self.best_val_loss = np.inf
         
     def fit(self, train_loader, val_loader=None, epochs=1, checkpoint_path=None, 
-            early_stopping=False, verbose=1, metrics=None, plot_loss=False):
+            early_stopping=False, verbose=1, plot_loss=False):
         """Train the model.
         Args:
             train_loader: A Pytorch Dataloader returning the training batches.
@@ -53,24 +51,15 @@ class Trainer(object):
             plot_loss (bool): If True, plot the training and validation loss 
             at the end.
         """
-        if metrics:
-            assert isinstance(metrics, (tuple, list))
-            for metric in metrics:
-                assert metric in ("data_time", "batch_time")
                     
         if early_stopping or checkpoint_path is not None:
             assert val_loader is not None
             if early_stopping:
                 assert isinstance(early_stopping, int)
-        best_val_loss = np.inf
-        n = 0
+            n = 0
             
-        if val_loader:
-            val_losses = []
-        
         if plot_loss:
-            train_losses = []
-        
+            logs = {}
         
         for epoch in range(1, epochs + 1):
             
@@ -78,32 +67,26 @@ class Trainer(object):
             self.progbar = self._make_progbar(train_loader, val_loader, verbose)
             
             # Training loop
-            self._train_loop(train_loader, metrics)
+            self._train_loop(train_loader)
             
             # Validation loop
             if val_loader:
-                self._validate_loop(val_loader, metrics)
+                self._validate_loop(val_loader)
             
-            # Track losses for plotting
-            if plot_loss:
-                train_losses.append(self.progbar._values["train_loss"].average())
-                if val_loader:
-                     val_losses.append(self.progbar._values["val_loss"].average())
+            # Get average value of all metrics for last epoch
+            metrics_val = self.progbar.logger.average()
             
             if val_loader:
                 # Save best model if improvement on validation loss
-                if checkpoint_path and self.progbar._values["val_loss"].average() < best_val_loss:
-                    # Save model_dict model_state_dict, optimizer_state_dict, epoch, 
+                if checkpoint_path and metrics_val["val_loss"] < self.best_val_loss:
+                    # Save model_dict model_state_dict, optimizer_state_dict
                     # and all metrics in progbar.
-                    metrics_dict = {"Epoch": epoch}
-                    for k in self.progbar._values.keys():
-                        metrics_dict[k] = self.progbar._values[k].average()
-                    self.save_checkpoint(checkpoint_path, metrics_dict)
+                    self.save_checkpoint(checkpoint_path, metrics_val)
                     print("Model improved, saved at " + checkpoint_path)
                 
                 # Check for early stopping
                 if early_stopping:
-                    if self.progbar._values["val_loss"].average() >= best_val_loss:
+                    if metrics_val["val_loss"] >= self.best_val_loss:
                         n += 1
                         if n < early_stopping:
                             print("No improvement in %d Epochs." % n)
@@ -114,15 +97,22 @@ class Trainer(object):
                         n = 0
                 
                 # Update best_val_loss
-                if self.progbar._values["val_loss"].average() < best_val_loss:
-                    best_val_loss = self.progbar._values["val_loss"].average()
+                if metrics_val["val_loss"] < self.best_val_loss:
+                    self.best_val_loss = metrics_val["val_loss"]
                     
+            if plot_loss:
+                for key in metrics_val:
+                    if key not in logs:
+                        logs[key] = [metrics_val[key]]
+                    else:
+                        logs[key].append(metrics_val[key])
+        
         # Plot loss
         if plot_loss:
             plt.figure()
-            plt.plot(train_losses, label="Training")
+            plt.plot(logs["train_loss"], label="Training")
             if val_loader:
-                plt.plot(val_losses, label="Validation")
+                plt.plot(logs["val_loss"], label="Validation")
             plt.ylabel("Loss")
             plt.xlabel("Epoch")
             plt.legend()
@@ -148,7 +138,10 @@ class Trainer(object):
         self.optimizer.step()
         
         # Track metrics
-        return [("train_loss", loss.item())]
+        values = {"train_loss": loss.item()}
+        for k in self.metrics:
+            values["train_" + k] = self.metrics[k](y_pred, y)
+        return values
     
     def validate(self, batch):
         """A single step of validation through one batch. 
@@ -165,38 +158,25 @@ class Trainer(object):
         y_pred = self.model(x)
         loss = self.loss_fn(y_pred, y)
 
-        # Track metrics
-        return [("val_loss", loss.item())]
+         # Track metrics
+        values = {"val_loss": loss.item()}
+        for k in self.metrics:
+            values["val_" + k] = self.metrics[k](y_pred, y)
+        return values
     
-    def _train_loop(self, train_loader, metrics):
+    def _train_loop(self, train_loader):
         """Do a single epoch of training."""
         # Set model to train mode
         self.model.train()
         
-        t0 = time.time()
         for batch in train_loader:
-            values = []
-            
-            if metrics:
-                if "data_time" in metrics:
-                    values.append(("data_time", (time.time() - t0)))
                 
-            vals = self.train(batch)
-            
-            if metrics:
-                if "batch_time" in metrics:
-                    values.append(("batch_time", (time.time() - t0)))
-            
-            for val in vals:
-                values.append(val)
+            values = self.train(batch)
                 
             # Update progress bar
             self.progbar.update(values)
             
-            t0 = time.time()
-          
-            
-    def _validate_loop(self, val_loader, metrics):
+    def _validate_loop(self, val_loader):
         """Do a single epoch of validating."""
         # Set model to eval mode
         self.model.eval()
@@ -207,6 +187,29 @@ class Trainer(object):
                 
                 # Update progress bar
                 self.progbar.update(values, validating=True)
+    
+    def check_data_time(self, train_loader):
+        """Perform one training loop through the dataloader to check batch data 
+        preparation time vs complete batch time."""
+        self.progbar = self._make_progbar(train_loader, val_loader=None, verbose=1)
+        self.model.train()
+        
+        t0 = time.time()
+        for batch in train_loader:
+            t_data = time.time() - t0
+                
+            _ = self.train(batch)
+            
+            t_batch = time.time() - t0
+            values = {}
+            values["t_data"] = t_data
+            values["t_batch"] = t_batch
+            values["t_data/t_batch"] = t_data / t_batch
+                
+            # Update progress bar
+            self.progbar.update(values)
+            
+            t0 = time.time()
     
     def save_checkpoint(self, path, metrics_dict=None):
         """Save a checkpoint of the model (the model state_dict and the 
@@ -232,6 +235,10 @@ class Trainer(object):
         
         # save checkpoint
         torch.save(checkpoint, path)
+    
+    def get_num_parameters(self):
+        """Return the total number of parameters of the model."""
+        return sum(reduce(lambda a, b: a*b, x.size()) for x in self.model.parameters())
                 
     def _make_progbar(self, train_loader, val_loader, verbose):
         """Make a progress bar to show training progress."""

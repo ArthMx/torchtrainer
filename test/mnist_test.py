@@ -5,7 +5,6 @@ from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 from torchtrainer import Trainer
 
-
 class Net(nn.Module):
     def __init__(self):
         super().__init__()
@@ -24,7 +23,12 @@ class Net(nn.Module):
         x = F.relu(self.fc1(x))
         x = self.dropout2(x)
         return F.log_softmax(self.fc2(x), 1)
-    
+
+def accuracy(y_pred, y):
+    """Compute the accuracy for a batch of prediction and target."""
+    _, y_pred = torch.max(y_pred, 1)
+    return (y_pred == y).cpu().numpy().mean()
+
 transform = transforms.ToTensor()
 # Download MNIST dataset
 root_dir = "../example/data/"
@@ -46,9 +50,9 @@ net = Net()
 loss_fn = F.nll_loss
 optimizer = torch.optim.Adam(net.parameters(), lr=0.001)
 
-trainer = Trainer(net, loss_fn, optimizer)
+trainer = Trainer(net, loss_fn, optimizer, metrics={"acc": accuracy})
 print("Number of trainable parameters: %d" % trainer.get_num_parameters())
+print(trainer.model)
 
 trainer.fit(train_loader, val_loader=test_loader, epochs=epochs, verbose=1,
-          checkpoint_path="models/checkpoint.tar", metrics=["data_time", "batch_time"],
           plot_loss=True, early_stopping=5)

@@ -1,5 +1,4 @@
 import numpy as np
-import collections
 import time
 import sys
 
@@ -25,37 +24,30 @@ class Progbar(object):
                                  'ipykernel' in sys.modules)
         self._total_width = 0
         self.current = 0
-        if self.val_target:
-            self.val_current = 0
-            self.val_step = 0
-        self._values = collections.OrderedDict()
+#         if self.val_target:
+        self.val_current = 0
+        self.val_step = 0
+        
+        self.logger = MetricsLogger()
+        
         self._start = time.time()
         self._last_update = 0
-        self.validating = False
-        
-        self.train_losses = []
-        self.val_losses = []
         
 
     def update(self, values=None, validating=False):
         """Updates the progress bar.
         # Arguments
-            current: Index of current step.
-            values: List of tuples:
-                `(name, value_for_last_step)`.
+            values: Dictionnary (str: numeric).
         """
-        values = values or []
-        for k, v in values:
-            if k not in self._values:
-                self._values[k] = AverageMeter()
-            
-            self._values[k].update(v)
+        self.logger.update(values)
         
         if not validating:
             self.current += 1
         else:
             self.val_current += 1
             if self.val_step == 0:
+                self.train_time = time.time() - self._start
+                self._start = time.time()
                 self.val_step = 1
                 self.current = 1
                 self.target = self.val_target
@@ -106,6 +98,8 @@ class Progbar(object):
                 info = ' - ETA: %s' % eta_format
             else:
                 info = ""
+                if validating:
+                    running_time += self.train_time 
                 if running_time > 3600:
                     info += ('%d:%02d:%02d' % (running_time // 3600, 
                                                (running_time % 3600) // 60, 
@@ -119,13 +113,8 @@ class Progbar(object):
                 elif running_time >= 1e6:
                     info += '%dus' % int(running_time * 1e6)
             
-            for k in self._values:
-                info += ' - %s:' % k
-                avg = self._values[k].average()
-                if abs(avg) > 1e-3:
-                    info += ' %.4f' % avg
-                else:
-                    info += ' %.4e' % avg
+            info += " - "
+            info += str(self.logger)
             
             info += ' ' * 50
             if (self.val_target is None) and (self.current == self.target) or \
@@ -142,6 +131,9 @@ class Progbar(object):
                     (self.val_current == self.val_target):
                 info = ""
                 running_time = now - self._start
+                if validating:
+                    running_time += self.train_time 
+                    
                 if running_time > 3600:
                     info += ('%d:%02d:%02d' % (running_time // 3600, 
                                                (running_time % 3600) // 60, 
@@ -155,20 +147,15 @@ class Progbar(object):
                 elif running_time >= 1e6:
                     info += '%dus' % int(running_time * 1e6)
             
-                for k in self._values:
-                    info += ' - %s:' % k
-                    avg = self._values[k].average()
-                    if abs(avg) > 1e-3:
-                        info += ' %.4f' % avg
-                    else:
-                        info += ' %.4e' % avg
+                info += " - "
+                info += str(self.logger)
         
                 info += '\n'
                 sys.stdout.write(info)
                 sys.stdout.flush()
 
         self._last_update = now
-        
+
 class AverageMeter(object):
     """Sum values to compute the mean."""
     def __init__(self):
@@ -184,3 +171,26 @@ class AverageMeter(object):
         
     def average(self):
         return self.sum / self.count
+
+class MetricsLogger(object):
+    """Keep log of multiple metrics."""
+    def __init__(self):
+        self.reset()
+        self.logs = {}
+    
+    def reset(self):
+        self.avgmeters = {}
+    
+    def update(self, values):
+        for key in values:
+            if key not in self.avgmeters:
+                self.avgmeters[key] = AverageMeter()
+            self.avgmeters[key].update(values[key])
+    
+    def average(self):
+        return {key: self.avgmeters[key].average() for key in self.avgmeters}
+            
+    def __str__(self):
+        avg = self.average()
+        str_list = [key + ": %.4f" % round(avg[key], 4) for key in avg]
+        return (" - ").join(str_list)
