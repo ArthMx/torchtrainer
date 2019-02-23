@@ -126,7 +126,7 @@ class Progbar(object):
             sys.stdout.flush()
             
             
-        elif self.verbose == 2:
+        elif self.verbose == 0:
             if (self.val_target is None and self.current == self.target) or \
                     (self.val_current == self.val_target):
                 info = ""

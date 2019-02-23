@@ -35,7 +35,7 @@ class Trainer(object):
         self.best_val_loss = np.inf
         
     def fit(self, train_loader, val_loader=None, epochs=1, checkpoint_path=None, 
-            early_stopping=False, verbose=1, plot_loss=False):
+            early_stopping=False, verbose=1, plot_loss=True):
         """Train the model.
         Args:
             train_loader: A Pytorch Dataloader returning the training batches.
@@ -47,11 +47,15 @@ class Trainer(object):
                 early stopping will be done if there is no improvement on the 
                 validation set after n epochs.
             verbose: Verbosity of the progress bar: 
-                0 (almost silent), 1 (verbose), 2 (semi-verbose).
+                - 0: almost silent, no progrss bar, only value after each 
+                    epochs for train loss, val loss and val metrics.
+                - 1: + Progress bar and show metrics updated in real time.
+                - 2: + train metrics.
             plot_loss (bool): If True, plot the training and validation loss 
             at the end.
         """
-                    
+        self.verbose = verbose
+        
         if early_stopping or checkpoint_path is not None:
             assert val_loader is not None
             if early_stopping:
@@ -139,8 +143,9 @@ class Trainer(object):
         
         # Track metrics
         values = {"train_loss": loss.item()}
-        for k in self.metrics:
-            values["train_" + k] = self.metrics[k](y_pred, y)
+        if self.verbose == 2:
+            for k in self.metrics:
+                values["train_" + k] = self.metrics[k](y_pred, y)
         return values
     
     def validate(self, batch):
