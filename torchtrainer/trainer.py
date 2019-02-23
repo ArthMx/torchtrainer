@@ -219,10 +219,10 @@ class Trainer(object):
             metrics_dict: A dictionnary of additional metrics that will be 
                 saved.
         """
-        # Create directory if necessary
-        checkpoint_dir = os.path.join(*path.split("/")[:-1])
-        if not os.path.exists(checkpoint_dir):
-            os.makedirs(checkpoint_dir)
+#        # Create directory if necessary
+#        checkpoint_dir = os.path.join(*path.split("/")[:-1])
+#        if not os.path.exists(checkpoint_dir):
+#            os.mkdir(checkpoint_dir)
         
         # make checkpoint
         checkpoint = {
